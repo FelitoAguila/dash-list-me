@@ -73,17 +73,21 @@ def users_percentage_chart(df, view):
     return fig
 
 def users_by_country (data, countries, view):
+    data['country'] = countries[0]
     filtered = data[data["country"].isin(countries)]
-    fig = px.area(filtered, x="date", y="count", color="country", title=f"{view} Active Users")
+    fig = px.area(filtered, x="date", y="total_users", color="country", title=f"{view} Active Users")
     fig.update_traces(mode='lines+markers', marker=dict(size=4, symbol='circle'))
+    fig.update_xaxes(type='category')
     fig.update_layout(yaxis_title="Users", xaxis_title="date", yaxis_tickformat=',', title_x=0.5)
     return fig
 
-def new_users_by_country (data, countries, view):
+def lists_by_country (data, countries, view):
+    data['country'] = countries[0]
     filtered = data[data["country"].isin(countries)]
-    fig = px.area(filtered, x="date", y="new_users", color="country", title=f"{view} Active Users")
+    fig = px.area(filtered, x="date", y="created_lists", color="country", title=f"{view} Successful")
     fig.update_traces(mode='lines+markers', marker=dict(size=4, symbol='circle'))
-    fig.update_layout(yaxis_title="Users", xaxis_title="date", yaxis_tickformat=',', title_x=0.5)
+    fig.update_xaxes(type='category')
+    fig.update_layout(yaxis_title="Lists", xaxis_title="date", yaxis_tickformat=',', title_x=0.5)
     return fig
 
 def dau_mau_ratio_chart(data, countries, title="DAU/MAU Ratio"):
@@ -129,4 +133,5 @@ def dau_mau_ratio_chart(data, countries, title="DAU/MAU Ratio"):
                       'Ratio DAU/MAU: %{y:.3f}<br>' +
                       '<extra></extra>'
     )    
+    fig.update_xaxes(type='category')
     return fig
