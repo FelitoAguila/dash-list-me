@@ -160,7 +160,7 @@ def group_monthly_data(df):
     monthly_df['date'] = monthly_df['date'].astype(str)
     return monthly_df
 
-def get_new_user_reminder_metrics_by_day(start_date: datetime, end_date: datetime, collection) -> pd.DataFrame:
+def get_new_user_lists_metrics_by_day(start_date: datetime, end_date: datetime, collection) -> pd.DataFrame:
     """
     Obtiene métricas por día de usuarios nuevos en su primer día de uso:
     - total de usuarios nuevos
@@ -340,7 +340,7 @@ def calculate_total_metrics(collection):
     
     # Obtener datos completos
     daily_data = get_daily_data(collection, start, end)
-    daily_new_users_data = get_new_user_reminder_metrics_by_day(start, end, collection)
+    daily_new_users_data = get_new_user_lists_metrics_by_day(start, end, collection)
 
     # Calcular métricas totales
     total_lists_attempted = int(daily_data['total_lists'].sum())
@@ -361,6 +361,55 @@ def calculate_total_metrics(collection):
         'total_failed_users': format_number_smart(total_failed_users)
     }
 
-def get_dau_mau_ratio_data(collection_dau, collection_mau, start_date, end_date, countries=None):
-    ratio_data = []    
+def get_dau_mau_ratio_data(collection, start_date, end_date, countries=None):
+    """
+    Obtiene datos combinados de DAU y MAU para calcular el ratio DAU/MAU
+    
+    Args:
+        collection_dau: Colección de datos diarios
+        collection_mau: Colección de datos mensuales  
+        start_date: Fecha inicio (YYYY-MM-DD)
+        end_date: Fecha fin (YYYY-MM-DD)
+        countries: Lista de países a filtrar (opcional)
+    
+    Returns:
+        DataFrame con columnas: year_month, country, avg_dau, mau, dau_mau_ratio
+    """
+    
+    # 1. Obtener datos DAU
+    dau_data = get_daily_data(collection, start_date, end_date)
+    dau_data['country'] = "Argentina"
+    
+    # 2. Obtener datos MAU  
+    mau_data = group_monthly_data(dau_data)
+    mau_data['country'] = "Argentina"
+    
+    # 3. Filtrar por países si se especifica
+    if countries:
+        dau_data = dau_data[dau_data['country'].isin(countries)]
+        mau_data = mau_data[mau_data['country'].isin(countries)]
+    
+    # 4. Crear year_month para DAU (agregar por mes)
+    dau_data['date'] = pd.to_datetime(dau_data['date'])
+    dau_data['year_month'] = dau_data['date'].dt.to_period('M').astype(str)
+    
+    # 5. Calcular DAU promedio por mes y país
+    avg_dau_monthly = dau_data.groupby(['year_month', 'country'])['total_users'].mean().reset_index()
+    avg_dau_monthly.rename(columns={'total_users': 'avg_dau'}, inplace=True)
+    
+    # 6. Preparar MAU data
+    mau_data['date'] = pd.to_datetime(mau_data['date'])
+    mau_data['year_month'] = mau_data['date'].dt.to_period('M').astype(str)
+    mau_monthly = mau_data.groupby(['year_month', 'country'])['total_users'].sum().reset_index()
+    mau_monthly.rename(columns={'total_users': 'mau'}, inplace=True)
+    
+    # 7. Combinar DAU y MAU
+    ratio_data = pd.merge(avg_dau_monthly, mau_monthly, on=['year_month', 'country'], how='inner')
+    
+    # 8. Calcular ratio DAU/MAU
+    ratio_data['dau_mau_ratio'] = ratio_data['avg_dau'] / ratio_data['mau']
+    
+    # 9. Ordenar por fecha
+    ratio_data = ratio_data.sort_values('year_month')
+    
     return ratio_data
