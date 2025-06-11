@@ -10,15 +10,15 @@ from charts import (active_users_chart, lists_chart, new_users_chart,
                     users_by_country, lists_by_country, dau_mau_ratio_chart)
 
 client = pymongo.MongoClient(MONGO_URI)
-db_LME_test = client[MONGO_DB_LIST_ME_TEST]
-collection_lme_test = db_LME_test[MONGO_COLLECTION_LISTS]
+db = client[MONGO_DB_LIST_ME]
+collection = db[MONGO_COLLECTION_LISTS]
 
 
 # Cache para gráficos (datos que cambian según filtros)
 _charts_cache = {}
 
 # Calcular métricas una sola vez al importar el módulo
-TOTAL_METRICS = calculate_total_metrics(collection_lme_test)
+TOTAL_METRICS = calculate_total_metrics(collection)
 
 def get_chart_data(view, start_date, end_date):
     """Obtiene datos para gráficos con cache"""
@@ -27,8 +27,8 @@ def get_chart_data(view, start_date, end_date):
     if cache_key not in _charts_cache:
         print(f"Obteniendo datos para gráficos: {view} desde {start_date} hasta {end_date}")
         start, end = parse_date_range(start_date, end_date)
-        data = get_daily_data(collection_lme_test, start, end)
-        new_data = get_new_user_lists_metrics_by_day(start, end, collection_lme_test)
+        data = get_daily_data(collection, start, end)
+        new_data = get_new_user_lists_metrics_by_day(start, end, collection)
         if view == 'Daily':
             _charts_cache[cache_key] = data, new_data
         elif view == 'Monthly':
@@ -45,7 +45,7 @@ def get_ratio_data(start_date, end_date, countries=None):
     if cache_key not in _ratio_cache:
         print(f"Obteniendo datos de ratio DAU/MAU para {countries}")
         start, end = parse_date_range(start_date, end_date)
-        _ratio_cache[cache_key] = get_dau_mau_ratio_data(collection_lme_test, start, end, countries)
+        _ratio_cache[cache_key] = get_dau_mau_ratio_data(collection, start, end, countries)
     return _ratio_cache[cache_key]
 
 def register_callbacks(app):
