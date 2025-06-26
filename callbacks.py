@@ -3,15 +3,17 @@ from config import MONGO_URI, MONGO_DB_LIST_ME, MONGO_COLLECTION_LISTS, MONGO_DB
 from dash import Input, Output, html, dcc
 import dash_bootstrap_components as dbc
 from datetime import datetime
-from get_data import (get_daily_data, group_monthly_data, get_new_user_lists_metrics_by_day, 
-                      calculate_total_metrics, get_dau_mau_ratio_data, parse_date_range,)
+from get_data import (get_daily_data, group_monthly_data, get_new_user_lists_metrics_by_day, get_notified_users,
+                      merge_notified_and_active, calculate_total_metrics, get_dau_mau_ratio_data, parse_date_range,)
 
-from charts import (active_users_chart, lists_chart, new_users_chart,
-                    users_by_country, lists_by_country, dau_mau_ratio_chart)
+from charts import (active_users_chart, lists_chart, new_users_chart, notified_chart,
+                    users_by_country, lists_by_country, funnel_chart, dau_mau_ratio_chart)
 
 client = pymongo.MongoClient(MONGO_URI)
 db = client[MONGO_DB_LIST_ME]
 collection = db[MONGO_COLLECTION_LISTS]
+db_TranscribeMe = client['TranscribeMe']
+collection_notifications = db_TranscribeMe['notifications']
 
 
 # Cache para gráficos (datos que cambian según filtros)
@@ -92,6 +94,8 @@ def register_callbacks(app):
                     html.Div([html.H3(f"{view} Lists", style={'textAlign': 'center'}), dcc.Graph(id='lists_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
                     html.Div([html.H3(f"{view} New Users", style={'textAlign': 'center'}), dcc.Graph(id='new_users_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
                     html.Div([html.H3(f"{view} New Users Lists", style={'textAlign': 'center'}), dcc.Graph(id='new_users_lists_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
+                    html.Div([html.H3(f"{view} Notified Users", style={'textAlign': 'center'}), dcc.Graph(id='notified_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
+                    html.Div([html.H3("Notified and Active Users", style={'textAlign': 'center'}), dcc.Graph(id='notified_and_active_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
                     html.Div([html.H3("Ratio", style={'textAlign': 'center'}), dcc.Graph(id='dau_mau_fig')], style={'flex': '1', 'minWidth': '45%', 'margin': '10px', 'border': '1px solid #ddd', 'borderRadius': '5px', 'padding': '10px'}),
                 ], style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-around'})
             ])
@@ -128,6 +132,8 @@ def register_callbacks(app):
             Output('lists_fig', 'figure'),
             Output('new_users_fig', 'figure'),
             Output('new_users_lists_fig', 'figure'),
+            Output('notified_fig', 'figure'),
+            Output ('notified_and_active_fig', 'figure'),
             Output('dau_mau_fig', 'figure')
         ],
         [
@@ -147,15 +153,21 @@ def register_callbacks(app):
         # Obtener datos para el período seleccionado
         data, new_users_data = get_chart_data(view, start_date_str, end_date_str)
         ratio_data = get_ratio_data(start_date_str, end_date_str)
-        
+        # Data de usuaarios notificados
+        notified_users = get_notified_users(collection_notifications, view)
+        # Mergeando la data
+        notified_and_active  = merge_notified_and_active(notified_users, new_users_data)
+
         # Generar gráficos
         active_users_fig = active_users_chart(data, view)
         lists_fig = lists_chart(data, view)
         new_users_fig = new_users_chart(new_users_data, view)
         new_users_list_fig = lists_chart(new_users_data, view)
+        notified_fig = notified_chart(notified_users, view)
+        notified_and_active_fig = funnel_chart(notified_and_active)
         dau_mau_fig = dau_mau_ratio_chart (ratio_data, ['Argentina'])
         
-        return active_users_fig, lists_fig, new_users_fig, new_users_list_fig, dau_mau_fig
+        return active_users_fig, lists_fig, new_users_fig, new_users_list_fig, notified_fig, notified_and_active_fig, dau_mau_fig
     
     # Callback para gráficos por país - SÍ cambian con filtros
     @app.callback(
