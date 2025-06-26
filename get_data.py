@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, time
 import pandas as pd
-from config import MONGO_URI, MONGO_DB_LIST_ME, MONGO_COLLECTION_LISTS, MONGO_DB_LIST_ME_TEST
 import pytz
 
 def parse_date_range(start_date_str: str, end_date_str: str) -> tuple[datetime, datetime]:
@@ -360,6 +359,99 @@ def calculate_total_metrics(collection):
         'total_successful_users': format_number_smart(total_successful_users),
         'total_failed_users': format_number_smart(total_failed_users)
     }
+
+def get_notified_users (collection, view: str = 'Daily'):
+    """
+    Busca en Mongo DB (TranscribeMe.notifications) todos los documentos con el campo 
+    lists_notif y toma el primer elemento del array, que representa la primera fecha de
+    notificación.
+
+    Args:
+    collection: colección TranscribeMe.notifications ya conectada 
+
+    Returns:
+    data: pandas Data Frame con la cantidad de usuarios notificados por fecha en la forma yyyy-mm-dd
+    """
+    # Definir zona horaria
+    tz = pytz.timezone('America/Argentina/Buenos_Aires')
+
+    # Pipeline de agregación
+    pipeline = [
+        # 1. Busca los documentos que tienen el campo lists_notif
+        {
+            "$match": {"lists_notif": {"$exists": True}}
+        },
+        # 2. Projectar solo el campo lists_notif
+        {
+            "$project":{"first_notification": {"$arrayElemAt": ["$lists_notif", 0]}, "_id": 0}
+        }
+    ]
+    
+    # Ejecutar el pipeline y obtener los resultados
+    results = list (collection.aggregate(pipeline))
+
+    # Convertir a Data Frame
+    data = pd.DataFrame(results)
+    
+    # Si no hay resultados, devolver DataFrame vacío con columnas adecuadas
+    if data.empty:
+        return pd.DataFrame(columns=['date', 'notified_users'])
+    
+    # Convertir timestamp a datetime en UTC y luego convertir a Buenos Aires
+    data["date"] = (pd.to_datetime(data["first_notification"], unit="s", utc=True).dt.tz_convert(tz).dt.strftime("%Y-%m-%d")    )
+    
+    # Agrupar según el valor de view
+    if view == 'Monthly':
+        # Extraer año y mes (yyyy-mm)
+        data['date'] = data['date'].str[:7]
+        # Agrupar por mes y sumar usuarios notificados
+        result = (
+            data.groupby('date')['date']
+            .count()
+            .reset_index(name='notified_users')
+            .sort_values('date')
+        )
+    else:
+        # Agrupar por fecha diaria y contar usuarios
+        result = (
+            data['date']
+            .value_counts()
+            .sort_index()
+            .reset_index(name='notified_users')
+            .rename(columns={'index': 'date'})
+        )
+
+    return result
+
+def merge_notified_and_active(notified_users: pd.DataFrame, data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combina dos DataFrames (notified_users y data) en un nuevo DataFrame llamado notified_and_active
+    con las columnas date, notified_users y total_users. Completa con ceros los valores faltantes.
+
+    Args:
+        notified_users (pd.DataFrame): DataFrame con columnas date y notified_users
+        data (pd.DataFrame): DataFrame con columnas date y total_users (entre otras)
+
+    Returns:
+        pd.DataFrame: DataFrame combinado con columnas date, notified_users y total_users
+    """
+    # Realizar un merge tipo outer sobre la columna date
+    notified_and_active = pd.merge(
+        notified_users[['date', 'notified_users']],
+        data[['date', 'total_users']],
+        on='date',
+        how='outer'
+    )
+
+    # Completar valores faltantes con ceros
+    notified_and_active['notified_users'] = notified_and_active['notified_users'].fillna(0).astype(int)
+    notified_and_active['total_users'] = notified_and_active['total_users'].fillna(0).astype(int)
+
+    # Asegurar que las columnas estén en el orden solicitado
+    notified_and_active = notified_and_active[['date', 'notified_users', 'total_users']]
+
+    return notified_and_active
+
 
 def get_dau_mau_ratio_data(collection, start_date, end_date, countries=None):
     """
