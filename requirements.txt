@@ -1,5 +1,6 @@
 pandas
 dash==2.14.1
+dash-auth==2.0.0
 plotly==5.18.0
 pymongo==4.6.1
 gunicorn==21.2.0
