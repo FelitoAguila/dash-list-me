@@ -505,3 +505,24 @@ def get_dau_mau_ratio_data(collection, start_date, end_date, countries=None):
     ratio_data = ratio_data.sort_values('year_month')
     
     return ratio_data
+
+def get_lists_content (collection):
+    """
+    Busca todos los documentos en MongoDB (ListMe.lists) y extrae los elementos de todas las listas,
+    y devuelve un dataframe
+
+    Args:
+        collection: Colección ListMe.lists ya conectada
+
+    Returns:
+        cursor: lista de diccionarios con la data
+    """
+    # Buscar documentos con status 'active' y campo 'items' existente
+    cursor = list (collection.find(
+        {"status": "active", "items": {"$exists": True}},
+        {"items": 1, "_id": 0}     # Proyectar solo el campo items, excluir _id
+    ))
+
+    listas = pd.DataFrame(cursor)
+    listas['items']= listas['items'].apply(lambda x: ', '.join(x))
+    return listas
