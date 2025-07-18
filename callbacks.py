@@ -3,8 +3,10 @@ from config import MONGO_URI, MONGO_DB_LIST_ME, MONGO_COLLECTION_LISTS, MONGO_DB
 from dash import Input, Output, html, dcc
 import dash_bootstrap_components as dbc
 from datetime import datetime
+import pandas as pd
 from get_data import (get_daily_data, group_monthly_data, get_new_user_lists_metrics_by_day, get_notified_users,
-                      merge_notified_and_active, calculate_total_metrics, get_dau_mau_ratio_data, parse_date_range,)
+                      merge_notified_and_active, calculate_total_metrics, get_dau_mau_ratio_data, parse_date_range,
+                      get_lists_content)
 
 from charts import (active_users_chart, lists_chart, new_users_chart, notified_chart,
                     users_by_country, lists_by_country, funnel_chart, dau_mau_ratio_chart)
@@ -203,4 +205,11 @@ def register_callbacks(app):
 
         return users_by_country_fig, lists_by_country_fig, new_users_by_country_fig, new_users_lists_by_country_fig
     
-    
+    @app.callback(
+        Output("download-dataframe-csv", "data"),
+        Input("btn_csv", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def func(n_clicks):
+        df = get_lists_content(collection)
+        return dcc.send_data_frame(df.to_csv, "contenido_listas.csv", index = False)
