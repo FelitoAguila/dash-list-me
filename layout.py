@@ -5,8 +5,6 @@ from get_data import get_daily_data
 
 timezone = pytz.timezone('America/Argentina/Buenos_Aires')
 
-
-
 def serve_layout():
     # Layout
     return html.Div([
@@ -17,7 +15,7 @@ def serve_layout():
         ),
         # Header
         html.Div([
-            html.H1("Dashboard- ListMe", 
+            html.H1("Dashboard - ListMe", 
                     style={"color": "#0AB84D", "marginBottom": "10px"}),
             html.Hr(style={"margin": "0 0 20px 0"}),
         ], style={"textAlign": "center", "paddingTop": "20px"}),
@@ -82,4 +80,11 @@ def serve_layout():
             # Contenido de las pestañas
             html.Div(id="tab-content")
         ], style={'margin': '20px'}),
+
+        # Sección de descarga de listas
+        html.Div([
+            html.H3("Descarga del contenido de listas"), 
+            html.Button("Download CSV", id="btn_csv"),
+            dcc.Download(id="download-dataframe-csv"),]
+            )
 ], style={'fontFamily': 'Arial, sans-serif', 'margin': '0 auto', 'maxWidth': '1400px', 'padding': '20px'})
